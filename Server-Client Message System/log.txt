@@ -1,1 +1,4 @@
 Bind Failedline:100
+Bind Failed  line: 102
+Bind Failed  line: 102
+Bind Failed  line: 104

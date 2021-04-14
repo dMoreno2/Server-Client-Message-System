@@ -3,6 +3,8 @@
 
 #pragma once
 
+#define _WINSOCK_DEPRECATED_NO_WARNINGS
+
 #include <iostream>
 #include <stdio.h>
 #include <stdlib.h>

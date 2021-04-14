@@ -1,7 +1,6 @@
 // Server-Client Message System.cpp : This file contains the 'main' function. Program execution begins and ends there.
 //
 #include "Server-Client Message System.h"
-#define _WINSOCK_DEPRECATED_NO_WARNINGS
 
 
 using namespace std;
@@ -17,12 +16,14 @@ void CloseConnection();
 void ReportError(int lineNum, string text);
 
 struct sockaddr_in newSock;
-struct in_addr newAddress;
 
-int sockId, newSocket, portNum, sockRead;
+int portNum, sockRead;
+
+SOCKET listenSocket, newSocket;
 
 char* newIP = (char*)malloc(10);
-char* buffer;
+char* sendBuffer = (char*)malloc(200);
+char recvBuffer[200];
 
 bool systemOn = true;
 bool connected = false;
@@ -30,6 +31,10 @@ bool connected = false;
 
 int main()
 {
+	WSADATA wsaData;
+
+	WSAStartup(2.2,&wsaData);
+
 	//loop to ensure correct input
 	while (systemOn)
 	{
@@ -81,9 +86,9 @@ void CreateSocket(bool serverSide)
 {
 	const char* ipNum = newIP;
 
-	sockId = socket(AF_INET, SOCK_STREAM, 0);
+	listenSocket = socket(AF_INET, SOCK_STREAM, 0);
 
-	if (sockId == NULL)
+	if (listenSocket == NULL)
 	{
 		cout << "ERROR";
 		ReportError(__LINE__, "Socket Creation Failed ");
@@ -91,20 +96,26 @@ void CreateSocket(bool serverSide)
 
 	newSock.sin_family = AF_INET;
 	newSock.sin_port = htons(portNum);
-	newSock.sin_addr.s_addr = INADDR_ANY;
+	newSock.sin_addr.s_addr = inet_addr(newIP);
 
 	//for the server, checks for open connections from the given socket info
 	if (serverSide)
 	{
 		//creates a socket from the given params if bind returns 1
-		if (bind(sockId, (struct sockaddr*)&newSock, sizeof(newSock)) < 0)
+		if (bind(listenSocket, (SOCKADDR*)&newSock, sizeof(newSock)) < 0)
 		{
 			cout << "Bind Failed";
+			int errorCode = WSAGetLastError();
 			ReportError(__LINE__, "Bind Failed ");
 		}
+		sendBuffer = new char['ACK'];
 
-		listen(sockId, 5);
+		listen(listenSocket, 5);
 		ConnectToServer(2);
+	}
+	else
+	{
+		ConnectToServer(1);
 	}
 }
 
@@ -114,7 +125,7 @@ void ConnectToServer(int programType)
 	{
 	case 1:
 		//searches for connection to server
-		if (connect(sockId, (struct sockaddr*)&newSock, sizeof(newSock)) < 0)
+		if (connect(listenSocket, (struct sockaddr*)&newSock, sizeof(newSock)) < 0)
 		{
 			cout << "Could not connect";
 			ReportError(__LINE__, "Connection Failed ");
@@ -127,13 +138,15 @@ void ConnectToServer(int programType)
 
 	case 2:
 		//creates a connection between server and client 
-		if (newSocket = accept(sockId, (struct sockaddr*)&newSock, (int*)sizeof(newSock)) < 0)
+		int addrLen = sizeof(newSock);
+		if (newSocket = accept(listenSocket, (SOCKADDR*)&newSock, &addrLen) < 0)
 		{
 			cout << "No Accept";
 			ReportError(__LINE__, "Accept connection failed. ");
 		}
 		else
 		{
+			cout << "\nCONNECTED\n";
 			connected = true;
 			SendAndRecieve();
 		}
@@ -143,28 +156,33 @@ void ConnectToServer(int programType)
 
 void SendAndRecieve(bool serverSide)
 {
-	while (connected)
-	{
-		buffer = (char*)malloc(200);
+	sendBuffer = (char*)malloc(200);
+	//recvBuffer = (char*)malloc(200);
 
-		if (sockRead = recv(newSocket, buffer, 200, 0) > 0) //reads buffer of open connect to see if anything is present and prints a result if true
+	do
+	{
+		sockRead = recv(newSocket, recvBuffer, (int)strlen(recvBuffer), 0); //reads buffer of open connect to see if anything is present and prints a result if true
+		
+		if(sockRead >= 0)
 		{
 			cout << sockRead;
+			cout << recvBuffer;
 		}
 
 		cout << "-Enter Message-\n";
 		cout << "-Or 'Close Connection'-\n";
-		fgets(buffer, 100, stdin);
+		fgets(recvBuffer, 100, stdin);
+	
 
-		if (buffer == "Close Connection")
+		if (sendBuffer == "Close Connection")
 		{
 			connected = false;
 			systemOn = false;
 		}
-		send(newSocket, buffer, 200, 0); //sends data to client/server
-	}
+		send(newSocket, sendBuffer, 200, 0); //sends data to client/server
+	} 	while (connected);
 
-	free(buffer);
+	free(sendBuffer);
 	CloseConnection();
 }
 
