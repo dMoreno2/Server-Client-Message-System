@@ -14,6 +14,8 @@ void ConnectToServer(int programType = 1);
 void SendAndRecieve(bool serverSide = false);
 void CloseConnection();
 void ReportError(int lineNum, string text);
+char* GetDateTime();
+
 
 struct sockaddr_in newSock;
 
@@ -24,6 +26,7 @@ SOCKET listenSocket, newSocket;
 char* newIP = (char*)malloc(10);
 char* sendBuffer = (char*)malloc(200);
 char recvBuffer[200];
+string user;
 
 bool systemOn = true;
 bool connected = false;
@@ -47,9 +50,13 @@ int main()
 		//starts program as either server or client given user input
 		switch (switchValue)
 		{
-		case 1:ClientSide();
+		case 1:
+			user = "Client";
+			ClientSide();
 			break;
-		case 2:ServerSide();
+		case 2:			
+			user = "Server";
+			ServerSide();
 			break;
 		}
 	}
@@ -197,9 +204,20 @@ void CloseConnection()
 //error file function that outputs a list of errors whilst runnin the porgram
 void ReportError(int lineNum, string text)
 {
+
 	logFile.open("log.txt", ios::app);
-	logFile << text << " " << "line: " << lineNum << endl;
+	logFile << user << "" << text << " " << "line: " << lineNum << "" << GetDateTime() << endl;
 	exit(EXIT_FAILURE);
+}
+
+char* GetDateTime()
+{
+	//usues the time_t api to get the current system time
+	time_t now = time(0);
+	//assigns time to data as a pointer
+	char* date = ctime(&now);
+
+	return date;
 }
 
 // Run program: Ctrl + F5 or Debug > Start Without Debugging menu
