@@ -22,7 +22,7 @@ int portNum, sockRead;
 SOCKET listenSocket, newSocket;
 
 char* newIP = (char*)malloc(10);
-char* sendBuffer = (char*)malloc(200);
+char sendBuffer[200];
 char recvBuffer[200];
 
 bool systemOn = true;
@@ -33,7 +33,7 @@ int main()
 {
 	WSADATA wsaData;
 
-	WSAStartup(2.2,&wsaData);
+	WSAStartup(2, &wsaData);
 
 	//loop to ensure correct input
 	while (systemOn)
@@ -86,7 +86,7 @@ void CreateSocket(bool serverSide)
 {
 	const char* ipNum = newIP;
 
-	listenSocket = socket(AF_INET, SOCK_STREAM, 0);
+	listenSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 
 	if (listenSocket == NULL)
 	{
@@ -108,7 +108,6 @@ void CreateSocket(bool serverSide)
 			int errorCode = WSAGetLastError();
 			ReportError(__LINE__, "Bind Failed ");
 		}
-		sendBuffer = new char['ACK'];
 
 		listen(listenSocket, 5);
 		ConnectToServer(2);
@@ -123,7 +122,7 @@ void ConnectToServer(int programType)
 {
 	switch (programType)
 	{
-	case 1:
+	case 1:	//FOR CLIENT
 		//searches for connection to server
 		if (connect(listenSocket, (struct sockaddr*)&newSock, sizeof(newSock)) < 0)
 		{
@@ -136,7 +135,7 @@ void ConnectToServer(int programType)
 
 		break;
 
-	case 2:
+	case 2: //FOR SERVER
 		//creates a connection between server and client 
 		int addrLen = sizeof(newSock);
 		if (newSocket = accept(listenSocket, (SOCKADDR*)&newSock, &addrLen) < 0)
@@ -148,7 +147,7 @@ void ConnectToServer(int programType)
 		{
 			cout << "\nCONNECTED\n";
 			connected = true;
-			SendAndRecieve();
+			SendAndRecieve(true);
 		}
 		break;
 	}
@@ -156,31 +155,33 @@ void ConnectToServer(int programType)
 
 void SendAndRecieve(bool serverSide)
 {
-	sendBuffer = (char*)malloc(200);
+	//sendBuffer = (char*)malloc(200);
 	//recvBuffer = (char*)malloc(200);
 
-	do
+	while (connected)
 	{
-		sockRead = recv(newSocket, recvBuffer, (int)strlen(recvBuffer), 0); //reads buffer of open connect to see if anything is present and prints a result if true
-		
-		if(sockRead >= 0)
-		{
-			cout << sockRead;
-			cout << recvBuffer;
-		}
+		sockRead = recv(newSocket, recvBuffer, 100, 0); //reads buffer of open connect to see if anything is present and prints a result if true
 
-		cout << "-Enter Message-\n";
+		int errorCode = WSAGetLastError();
+		ReportError(errorCode, "Sockread returned");
+
+		cout << "-Enter Message- ";
 		cout << "-Or 'Close Connection'-\n";
-		fgets(recvBuffer, 100, stdin);
-	
+		fgets(sendBuffer, 100, stdin);
+		
 
-		if (sendBuffer == "Close Connection")
+		if (sendBuffer == "Close Connection" || sockRead < 0)
 		{
 			connected = false;
 			systemOn = false;
 		}
-		send(newSocket, sendBuffer, 200, 0); //sends data to client/server
-	} 	while (connected);
+
+		send(newSocket, sendBuffer, 100, 0); //sends data to client/server
+
+		
+		//cout << sockRead;
+		printf("%s\n",recvBuffer);
+	}
 
 	free(sendBuffer);
 	CloseConnection();
