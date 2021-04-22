@@ -14,7 +14,7 @@ void CreateSocket(bool serverSide = false);
 void ConnectToServer(int programType = 1);
 void SendAndRecieve(bool serverSide = false);
 void CloseConnection();
-void getPortandIp();
+void GetPortandIP();
 void ReportError(int lineNum, string text, int errorCode = 0);
 char* GetDateTime(bool formated = true);
 
@@ -50,7 +50,7 @@ int main()
 		cout << "WSAStarup Failed";
 		ReportError(__LINE__, "WSAStarup Failed ", WSAGetLastError());
 	}
-	getPortandIp();
+	GetPortandIP();
 
 	//loop to ensure correct input
 	while (systemOn)
@@ -106,19 +106,9 @@ void CreateSocket(bool serverSide)
 
 	newSock.sin_family = AF_INET;
 	newSock.sin_port = htons(portNum);
-
-	if (serverSide)
-	{
-		//newSock.sin_family = AF_INET;
-		//newSock.sin_port = htons(portNum);
-		newSock.sin_addr.s_addr = inet_addr(newIP);
-	}
-	else
-	{
-		inet_pton(AF_INET, ipNum, &newSock.sin_addr);
-	}
-
-
+	newSock.sin_addr.s_addr = inet_addr(newIP);
+	inet_pton(AF_INET, ipNum, &newSock.sin_addr);
+	
 	listenSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 
 	if (listenSocket == INVALID_SOCKET)
@@ -280,7 +270,7 @@ void CloseConnection()
 }
 
 
-void getPortandIp()
+void GetPortandIP()
 {
 	ifstream configFile;
 
