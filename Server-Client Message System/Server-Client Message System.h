@@ -11,6 +11,10 @@
 #include <stdlib.h>
 #include <string.h>  
 #include <fstream>
+#include <string>  
+#include <queue>
+#include <thread>  
+
 
 
 // TODO: Make sure defs work

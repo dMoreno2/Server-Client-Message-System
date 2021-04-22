@@ -5,32 +5,30 @@
 
 using namespace std;
 ofstream logFile;
+ofstream messageLog;
 
 
-void ClientSide();
-void ServerSide();
+void ProgramStart(int switchValue);
 
 void CreateSocket(bool serverSide = false);
-void ConnectToServer(int programType = 1);
+//void ConnectToServer(int programType = 1);
+char* MakeMessage(int seq, int count);
 void SendAndRecieve(bool serverSide = false);
 void CloseConnection();
 void GetPortandIP();
+void GenerateMessageLog(string textString);
+void WriteMessagesToFile();
 void ReportError(int lineNum, string text, int errorCode = 0);
 char* GetDateTime(bool formated = true);
 
 SOCKET listenSocket = INVALID_SOCKET;
-SOCKET newSocket = INVALID_SOCKET;
 
-sockaddr_in newSock;
+struct sockaddr_in newSock, otherSock;
 
-struct addrinfo* result = NULL,
-	* ptr = NULL,
-	hints;
-
-int portNum, sockRead, iResult;
+int portNum, sockLen = sizeof(otherSock), iResult;
 
 char* newIP = (char*)malloc(sizeof(char) * 15);
-char sendBuffer[200] = "test message";
+const char* response = "R";
 char recvBuffer[200]; //= (char*)malloc(200);
 
 string user;
@@ -38,6 +36,9 @@ string user;
 bool systemOn = true;
 bool connected = false;
 
+thread WriteToLog;
+
+queue <string> textQueue;
 
 
 
@@ -45,11 +46,15 @@ int main()
 {
 	WSADATA wsaData;
 	iResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
-	if (iResult !=0 )
+	if (iResult != 0)
 	{
 		cout << "WSAStarup Failed";
 		ReportError(__LINE__, "WSAStarup Failed ", WSAGetLastError());
 	}
+
+	thread WriteToLog(WriteMessagesToFile);
+	WriteToLog.detach();
+
 	GetPortandIP();
 
 	//loop to ensure correct input
@@ -67,49 +72,62 @@ int main()
 		{
 		case 1:
 			user = "Client";
-			ClientSide();
+			ProgramStart(1);
 			break;
 		case 2:
 			user = "Server";
-			ServerSide();
+			ProgramStart(2);
 			break;
 		case 3:
 			systemOn = false;
 		}
 	}
+
+	while (!textQueue.empty())
+	{
+		printf("Please Wait While Information Is written to the log\n");
+		std::this_thread::sleep_for(0.1s);
+	}
+
+	printf("Task Finished\n");
+	printf("Exiting\n");
+	WriteToLog.~thread();
+
 	return 0;
 }
 
-void ClientSide()
+void ProgramStart(int switchValue)
 {
-
-	cout << "WELCOME CLIENT SIDE OPERATIONS\n\n";
+	cout << "WELCOME TO " << user << " SIDE OPERATIONS\n\n";
 	cout << "IP Address and Port can be editied in the config file\n";
 	cout << "IP: " << newIP << " | " << "Port: " << portNum << endl;
 
-	CreateSocket();
-}
-
-void ServerSide()
-{
-	cout << "WELCOME SERVER SIDE OPERATIONS\n\n";
-	cout << "IP Address and Port can be editied in the config file\n";
-	cout << "IP: " << newIP << " | " << "Port: " << portNum << endl;
-
+	switch (switchValue)
+	{
+	case 1:
+		//Client
+		CreateSocket();
+		break;
+	case 2:
+		//Server
+		CreateSocket(true);
+		break;
+	}
 	//calls the CreateSocket function as the server
-	CreateSocket(true);
 }
 
 void CreateSocket(bool serverSide)
 {
 	const char* ipNum = newIP;
 
-	newSock.sin_family = AF_INET;
-	newSock.sin_port = htons(portNum);
-	newSock.sin_addr.s_addr = inet_addr(newIP);
-	inet_pton(AF_INET, ipNum, &newSock.sin_addr);
-	
-	listenSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	if (serverSide)
+	{
+		listenSocket = socket(AF_INET, SOCK_DGRAM, 0);
+	}
+	else
+	{
+		listenSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+	}
 
 	if (listenSocket == INVALID_SOCKET)
 	{
@@ -117,156 +135,207 @@ void CreateSocket(bool serverSide)
 		ReportError(__LINE__, "Socket Creation Failed %d", WSAGetLastError());
 	}
 
+	if (serverSide)
+	{
+		newSock.sin_family = AF_INET;
+		newSock.sin_addr.s_addr = INADDR_ANY;
+		newSock.sin_port = htons(portNum);
+	}
+
+	else
+	{
+		otherSock.sin_family = AF_INET;
+		otherSock.sin_port = htons(portNum);
+		otherSock.sin_addr.S_un.S_addr = inet_addr(ipNum);
+	}
 
 	//for the server, checks for open connections from the given socket info
 	if (serverSide)
 	{
 		//creates a socket from the given params if bind returns 1
-		iResult = bind(listenSocket, (SOCKADDR*)&newSock, sizeof(newSock));
+		iResult = bind(listenSocket, (struct sockaddr*)&newSock, sizeof(newSock));
 		if (iResult == SOCKET_ERROR)
 		{
 			cout << "Bind Failed";
 			ReportError(__LINE__, "Bind Failed ", WSAGetLastError());
 		}
+		//ConnectToServer(2);
 
-		iResult = listen(listenSocket, 5);
-		if (iResult == SOCKET_ERROR)
-		{
-			cout << "Listen Failed";
-			ReportError(__LINE__, "Listen Failed ", WSAGetLastError());
-		}
-
-		ConnectToServer(2);
+		cout << "\nCONNECTED\n";
+		connected = true;
+		SendAndRecieve(true);
 	}
 	else
 	{
-		ConnectToServer(1);
+		//ConnectToServer(1);
+		connected = true;
+		SendAndRecieve();
 	}
 }
 
-void ConnectToServer(int programType)
+//void ConnectToServer(int programType)
+//{
+//	switch (programType)
+//	{
+//	case 1:	//FOR CLIENT
+//		//searches for connection to server
+//		if (connect(listenSocket, (struct sockaddr*)&newSock, sizeof(newSock)) < 0)
+//		{
+//			cout << "Could not connect ";
+//			ReportError(__LINE__, "Connection Failed ", WSAGetLastError());
+//		}
+//		connected = true;
+//
+//		SendAndRecieve();
+//
+//		break;
+//
+//	case 2: //FOR SERVER
+//		//creates a connection between server and client 
+//		int addrLen = sizeof(newSock);
+//		newSocket = accept(listenSocket, (SOCKADDR *)&newSock, &addrLen);
+//		if (newSocket == INVALID_SOCKET)
+//		{
+//			cout << "No Accept";
+//			ReportError(__LINE__, "Accept connection failed. ", WSAGetLastError());
+//		}
+//		else
+//		{
+//			cout << "\nCONNECTED\n";
+//			connected = true;
+//			closesocket(listenSocket);
+//			SendAndRecieve(true);
+//		}
+//		break;
+//	}
+//}
+
+char* MakeMessage(int seq, int count)
 {
-	switch (programType)
+	SYSTEMTIME lt;
+
+	GetLocalTime(&lt);
+
+	string ack = "ACK";
+	string R = "R";
+	string E = "E";
+	string recieved = "recieved at:";
+	string seqNum = to_string(seq);
+	string milSeconds = to_string(lt.wMilliseconds);
+	string seconds = to_string(lt.wSecond);
+	string mins = to_string(lt.wMinute);
+	string hours = to_string(lt.wHour);
+	string text;
+
+	if (count % 4 == 0)
 	{
-	case 1:	//FOR CLIENT
-		//searches for connection to server
-		if (connect(listenSocket, (struct sockaddr*)&newSock, sizeof(newSock)) < 0)
-		{
-			cout << "Could not connect ";
-			ReportError(__LINE__, "Connection Failed ", WSAGetLastError());
-		}
-		connected = true;
-
-		SendAndRecieve();
-
-		break;
-
-	case 2: //FOR SERVER
-		//creates a connection between server and client 
-		int addrLen = sizeof(newSock);
-		newSocket = accept(listenSocket, (SOCKADDR *)&newSock, &addrLen);
-		if (newSocket == INVALID_SOCKET)
-		{
-			cout << "No Accept";
-			ReportError(__LINE__, "Accept connection failed. ", WSAGetLastError());
-		}
-		else
-		{
-			cout << "\nCONNECTED\n";
-			connected = true;
-			closesocket(listenSocket);
-			SendAndRecieve(true);
-		}
-		break;
+		text = R + " " + seqNum + " " + hours + ":" + mins + ":" + seconds + ":" + milSeconds;
 	}
+	if (count % 4 == 1)
+	{
+		text = ack + " " + R + " " + seqNum + " " + hours + ":" + mins + ":" + seconds + ":" + milSeconds;
+	}
+	if (count % 4 == 2)
+	{
+		text = ack + " " + R + " " + seqNum + " " + recieved + " " + hours + ":" + mins + ":" + seconds + ":" + milSeconds;
+	}
+	if (count % 4 == 3)
+	{
+		text = ack + " " + seqNum + " " + hours + ":" + mins + ":" + seconds + ":" + milSeconds;
+		//to do: roudtrip value calc
+	}
+	if (count == 10)
+	{
+		text = E + " " + seqNum + " " + hours + ":" + mins + ":" + seconds + ":" + milSeconds;
+		//to do: roudtrip value calc
+	}
+
+
+	char* temp = (char*)malloc(sizeof(text));
+
+	temp = strcpy(new char[text.length() + 1], text.c_str());
+
+	return temp;
 }
 
 void SendAndRecieve(bool serverSide)
 {
-	//sendBuffer = (char*)malloc(200);
-	//recvBuffer = 
 	char* tempBuffer = (char*)malloc(200);
-	//int currentTime = (int)GetDateTime(false);
+	int seqNum = 000;
+	int count = 0;
+	int recvResult;
 
 	while (connected)
 	{
-		/*if ((int)GetDateTime(false) == currentTime + 3 )
-		{*/
-			if (serverSide)
-			{
-				//cout << "-Enter Message- ";
-				//cout << "-Or 'Close Connection'-\n";
-				//fgets(sendBuffer, 100, stdin);
-				iResult = send(newSocket, sendBuffer, 100, 0); //sends data to client/server
-				if (iResult == SOCKET_ERROR)
-				{
-					cout << "Send Failed ";
-					ReportError(__LINE__, "Send Failed ", WSAGetLastError());
-				}
-				if (iResult > 0)
-				{
-					serverSide = !serverSide;
-				}
-				else
-				{
-					cout << "INVALID SEND - NOTHING PASSED";
-					cout << "-Enter Message- ";
-					cout << "-Or 'E to Exit'-\n";
-					fgets(tempBuffer, 100, stdin);
-				}
-			}
-			int recvResult = recv(newSocket, recvBuffer, sizeof(recvBuffer), 0); //reads buffer of open connect to see if anything is present and prints a result if true
+		switch (serverSide)
+		{
+		case true:
+			recvResult = recvfrom(listenSocket, recvBuffer, 100, 0, (struct sockaddr*)&otherSock, &sockLen);
 			if (recvResult < 0)
 			{
 				cout << "Receve Error " << WSAGetLastError();
-				//ReportError(__LINE__, "Receve Error ", WSAGetLastError());
 			}
 			if (recvResult > 0)
 			{
-				cout << recvBuffer;
-				ReportError(__LINE__, recvBuffer);
-			}
-			if (recvResult > 0 && serverSide == false)
-			{
+				cout << "MESSAGE: " << recvBuffer << endl;
+				textQueue.push(recvBuffer);
+				//Sleep(3000);
 				serverSide = !serverSide;
 			}
+			break;
 
-			if (sendBuffer == "Close Connection" || tempBuffer == "Close Connection")
+		case false:
+			tempBuffer = MakeMessage(seqNum, count);
+			iResult = sendto(listenSocket, tempBuffer, 100, 0, (struct sockaddr*)&otherSock, sockLen);
+			if (iResult == SOCKET_ERROR)
 			{
-				connected = false;
+				cout << "Send Failed ";
+				ReportError(__LINE__, "Send Failed ", WSAGetLastError());
 			}
-
-			if (GetKeyState('E') & 0x8000/*Check if high-order bit is set (1 << 15)*/)
+			if (iResult > 0)
 			{
-				string userResponse;
-				cout << "E Detected, Wanna Exit? - Y/N \n";
-				cin >> userResponse;
-				if (userResponse == "Y" || userResponse == "y")
+				Sleep(3000);
+				serverSide = !serverSide;
+				count++;
+				if (count % 4 == 0)
 				{
-					connected == false;
-					break;
+					seqNum++;
 				}
 			}
-		//}
-	}
+			break;
+		}
 
-	//free(sendBuffer);
+		if (GetKeyState('E') & 0x8000/*Check if high-order bit is set (1 << 15)*/)
+		{
+			string userResponse;
+			cout << "E Detected, Wanna Exit? - Y/N \n";
+			cin >> userResponse;
+			if (userResponse == "Y" || userResponse == "y")
+			{
+				tempBuffer = MakeMessage(seqNum, 10);
+				sendto(listenSocket, tempBuffer, 100, 0, (struct sockaddr*)&otherSock, sockLen);
+				recvfrom(listenSocket, recvBuffer, 100, 0, (struct sockaddr*)&otherSock, &sockLen);
+				sendto(listenSocket, tempBuffer, 100, 0, (struct sockaddr*)&otherSock, sockLen);
+				connected == false;
+				break;
+			}
+		}
+	}
 	CloseConnection();
 }
 
 void CloseConnection()
 {
-	iResult = shutdown(newSocket, SD_SEND);
+	iResult = shutdown(listenSocket, SD_SEND);
 	if (iResult == INVALID_SOCKET)
 	{
 		cout << "Shutdown Failure ";
 		ReportError(WSAGetLastError(), "Shutdown Failure: ");
 	}
 
-	closesocket(newSocket); //closes the open sockets
+	closesocket(listenSocket); //closes the open sockets
 
 	WSACleanup(); //standard winsock function to cleanup after and close all existing socket resources	
-	exit(EXIT_FAILURE);
 }
 
 
@@ -298,12 +367,30 @@ void GetPortandIP()
 }
 
 
+void WriteMessagesToFile()
+{
+	string messageFile = user + " " + "messagelog.txt";
+	messageLog.open(messageFile, ios::app);
+
+	while (0 == 0)
+	{
+		if (!textQueue.empty())
+		{
+			messageLog << textQueue.front() << endl;
+			textQueue.pop();
+		}
+		this_thread::sleep_for(10ms);
+	}
+}
+
+
 //error file function that outputs a list of errors whilst runnin the porgram
 void ReportError(int lineNum, string text, int errorCode)
 {
-	string file = user + " " +"log.txt";
+	string file = user + " " + "log.txt";
 
 	logFile.open(file, ios::app);
+
 	if (errorCode > 0)
 	{
 		logFile << user << "- " << text << " " << "line: " << lineNum << " " << "Error Code: " << errorCode << " " << GetDateTime() << endl;
@@ -331,7 +418,7 @@ char* GetDateTime(bool formated)
 	{
 		time_t currentTime = time(0);
 		struct tm* timeSince = gmtime(&currentTime);
-		return (char*)timeSince->tm_sec;
+		return (char*)timeSince;
 	}
 }
 

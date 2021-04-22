@@ -1,2 +1,10 @@
 Server- Send Failed  line: 212 Error Code: 10054 Thu Apr 22 12:45:46 2021
 
+Server- a Exit? - Y/N 
+Thu Apr 22 21:50:15 2021
+ line: 777Thu Apr 22 21:50:33 2021
+
+Server- a Exit? - Y/N 
+Thu Apr 22 21:58:50 2021
+ line: 777Thu Apr 22 21:59:09 2021
+
