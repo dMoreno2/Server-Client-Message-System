@@ -4,6 +4,7 @@
 #pragma once
 
 #define _WINSOCK_DEPRECATED_NO_WARNINGS
+#define _CRT_SECURE_NO_WARNINGS
 
 #include <iostream>
 #include <stdio.h>
@@ -12,9 +13,11 @@
 #include <fstream>
 
 
-// TODO: Reference additional headers your program requires here.
+// TODO: Make sure defs work
+
 #ifdef _WIN32 || _WIN64
-# include <winsock2.h>
+#include <winsock2.h>
+#include <ws2tcpip.h>
 #endif
 
 #ifdef __unix__
