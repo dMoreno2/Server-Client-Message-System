@@ -185,8 +185,8 @@ char* MakeMessage(int seq, int count, bool specialVal)
 	string ack = "ACK";
 	string R = "R";
 	string E = "E";
-	string recieved = "recieved at:";
-	string seqNum = to_string(seq);
+	string recieved = "Recieved at:";
+	string seqNum = "00" + to_string(seq);
 	string milSeconds = to_string(lt.wMilliseconds);
 	string seconds = to_string(lt.wSecond);
 	string mins = to_string(lt.wMinute);
@@ -197,7 +197,7 @@ char* MakeMessage(int seq, int count, bool specialVal)
 	{
 		if (count % 3 == 0)
 		{
-			text = E + " " + seqNum + " " + hours + ":" + mins + ":" + seconds + ":" + milSeconds;
+			text = E + " " + seqNum + " " + recieved + " " + hours + ":" + mins + ":" + seconds + ":" + milSeconds;
 			// R E 002 12:12:122
 
 			//create char pointer at the size of text to hold text passed out of function
@@ -211,7 +211,7 @@ char* MakeMessage(int seq, int count, bool specialVal)
 		}
 		if (count % 3 == 1)
 		{
-			text = ack + " " + E + " " + seqNum + " " + hours + ":" + mins + ":" + seconds + ":" + milSeconds;
+			text = ack + " " + E + " " + seqNum + " " + recieved + " " + hours + ":" + mins + ":" + seconds + ":" + milSeconds;
 			// ACK E 002 12:12:122
 
 			//create char pointer at the size of text to hold text passed out of function
@@ -225,7 +225,7 @@ char* MakeMessage(int seq, int count, bool specialVal)
 		}
 		if (count % 3 == 2)
 		{
-			text = ack + " " + seqNum + " " + hours + ":" + mins + ":" + seconds + ":" + milSeconds;
+			text = ack + " " + seqNum + " " + recieved + " " + hours + ":" + mins + ":" + seconds + ":" + milSeconds;
 			// E 002 12:12:122
 
 			//create char pointer at the size of text to hold text passed out of function
@@ -242,7 +242,7 @@ char* MakeMessage(int seq, int count, bool specialVal)
 	if (count % 4 == 0)
 	{
 		//request text
-		text = R + " - " + seqNum + " - " + hours + ":" + mins + ":" + seconds + ":" + milSeconds;
+		text = R + " - " + seqNum + " - " + recieved + " " + hours + ":" + mins + ":" + seconds + ":" + milSeconds;
 		previousTime = stoi(seconds) * 1000;
 		previousTime += stoi(milSeconds);
 		//cout << "Initial Time:" << previousTime << endl;
@@ -293,6 +293,59 @@ void SendAndRecieve(bool serverSide)
 
 	while (connected)
 	{
+		//checks if E check is pressed
+		if (user == "Server" && GetKeyState('E') & 0x8000/*Check if high-order bit is set (1 << 15)*/)
+		{
+			string userResponse;
+			cout << "E Detected, Wanna Exit? - Y/N \n";
+			//gets user input
+			cin >> userResponse;
+			if (userResponse == "Y" || userResponse == "y")
+			{
+				count = 0;
+				seqNum++;
+
+				//generates End message, sends to partner, prints message to screen, adds message to queue, waits 3 seconds 
+				tempBuffer = MakeMessage(seqNum, count, true);
+				sendto(listenSocket, tempBuffer, 100, 0, (struct sockaddr*)&otherSock, sockLen);
+				//cout << "MESSAGE: " << recvBuffer << endl;
+				textQueue.push(recvBuffer);
+				Sleep(1000);
+
+				count += 2;
+
+				//recives message, prints message to screen, adds message to queue, waits 3 seconds
+				recvfrom(listenSocket, recvBuffer, 100, 0, (struct sockaddr*)&otherSock, &sockLen);
+				cout << "MESSAGE: " << recvBuffer << endl;
+				textQueue.push(recvBuffer);
+				Sleep(1000);
+
+				//generates End message, sends to partner, prints message to screen, adds message to queue, waits 3 seconds 
+				tempBuffer = MakeMessage(seqNum, count, true);
+				sendto(listenSocket, tempBuffer, 100, 0, (struct sockaddr*)&otherSock, sockLen);
+				//cout << "MESSAGE: " << recvBuffer << endl;
+				textQueue.push(recvBuffer);
+				Sleep(1000);
+
+				//recives message, prints message to screen, adds message to queue, waits 3 seconds
+				recvfrom(listenSocket, recvBuffer, 100, 0, (struct sockaddr*)&otherSock, &sockLen);
+				cout << "MESSAGE: " << recvBuffer << endl;
+				textQueue.push(recvBuffer);
+				Sleep(1000);
+
+				//generates End message, sends to partner, prints message to screen, adds message to queue, waits 3 seconds 
+				tempBuffer = MakeMessage(seqNum, count, true);
+				sendto(listenSocket, tempBuffer, 100, 0, (struct sockaddr*)&otherSock, sockLen);
+				//cout << "MESSAGE: " << recvBuffer << endl;
+				textQueue.push(recvBuffer);
+				Sleep(1000);
+
+				connected == false;
+
+			}
+			break;
+		}
+
 		//checks if running program as sever or client
 		switch (serverSide)
 		{
@@ -312,6 +365,10 @@ void SendAndRecieve(bool serverSide)
 				textQueue.push(recvBuffer);
 				//Sleep(3000);
 				serverSide = !serverSide;
+			}
+			if (recvResult == 0 && recvBuffer[0] == 'E')
+			{
+				serverSide = true;
 			}
 			break;
 
@@ -364,11 +421,11 @@ void SendAndRecieve(bool serverSide)
 			break;
 		}
 
-		if (recvBuffer[0] == 'E')
+		if (recvBuffer[0] == 'E' && user == "Client")
 		{
 			count = 1;
-			seqNum++;
-			
+			//seqNum++;
+
 			//recives message, prints message to screen, adds message to queue, waits 3 seconds
 			recvfrom(listenSocket, recvBuffer, 100, 0, (struct sockaddr*)&otherSock, &sockLen);
 			cout << "MESSAGE: " << recvBuffer << endl;
@@ -378,7 +435,7 @@ void SendAndRecieve(bool serverSide)
 			//generates End message, sends to partner, prints message to screen, adds message to queue, waits 3 seconds 
 			tempBuffer = MakeMessage(seqNum, count, true);
 			sendto(listenSocket, tempBuffer, 100, 0, (struct sockaddr*)&otherSock, sockLen);
-			cout << "MESSAGE: " << recvBuffer << endl;
+			//cout << "MESSAGE: " << recvBuffer << endl;
 			textQueue.push(recvBuffer);
 			Sleep(1000);
 
@@ -388,52 +445,15 @@ void SendAndRecieve(bool serverSide)
 			textQueue.push(recvBuffer);
 			Sleep(1000);
 
+			////generates End message, sends to partner, prints message to screen, adds message to queue, waits 3 seconds 
+			//tempBuffer = MakeMessage(seqNum, count);
+			//sendto(listenSocket, tempBuffer, 100, 0, (struct sockaddr*)&otherSock, sockLen);
+			////cout << "MESSAGE: " << recvBuffer << endl;
+			//textQueue.push(recvBuffer);
+			//Sleep(1000);
+
 			connected == false;
-
-
 			break;
-		}
-
-		//checks if E check is pressed
-		if (user == "Server")
-		{
-			if (GetKeyState('E') & 0x8000/*Check if high-order bit is set (1 << 15)*/)
-			{
-				string userResponse;
-				cout << "E Detected, Wanna Exit? - Y/N \n";
-				//gets user input
-				cin >> userResponse;
-				if (userResponse == "Y" || userResponse == "y")
-				{
-					count = 0;
-					seqNum++;
-					//generates End message, sends to partner, prints message to screen, adds message to queue, waits 3 seconds 
-					tempBuffer = MakeMessage(seqNum, count, true);
-					sendto(listenSocket, tempBuffer, 100, 0, (struct sockaddr*)&otherSock, sockLen);
-					cout << "MESSAGE: " << recvBuffer << endl;
-					textQueue.push(recvBuffer);
-					Sleep(1000);
-					
-
-					//recives message, prints message to screen, adds message to queue, waits 3 seconds
-					recvfrom(listenSocket, recvBuffer, 100, 0, (struct sockaddr*)&otherSock, &sockLen);
-					cout << "MESSAGE: " << recvBuffer << endl;
-					textQueue.push(recvBuffer);
-					Sleep(1000);
-					count = 2;
-
-					//generates End message, sends to partner, prints message to screen, adds message to queue, waits 3 seconds 
-					tempBuffer = MakeMessage(seqNum, count, true);
-					sendto(listenSocket, tempBuffer, 100, 0, (struct sockaddr*)&otherSock, sockLen);
-					cout << "MESSAGE: " << recvBuffer << endl;
-					textQueue.push(recvBuffer);
-					Sleep(1000);
-
-					connected == false;
-
-				}
-				break;
-			}
 		}
 	}
 	CloseConnection();
@@ -467,7 +487,7 @@ void GetPortandIP()
 	configFile >> ip;
 
 
-	configFile.seekg(21);
+	configFile.seekg(ip.length()+12);
 	configFile >> port;
 
 	newIP = (char*)malloc(sizeof(ip));
