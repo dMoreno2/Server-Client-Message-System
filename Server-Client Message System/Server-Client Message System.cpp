@@ -45,17 +45,21 @@ queue <string> textQueue;
 
 int main()
 {
+	//WSA statup 
 	WSADATA wsaData;
 	iResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
+
 	if (iResult != 0)
 	{
 		cout << "WSAStarup Failed";
 		ReportError(__LINE__, "WSAStarup Failed ", WSAGetLastError());
 	}
 
+	//creates thread to write messages to a log
 	thread WriteToLog(WriteMessagesToFile);
 	WriteToLog.detach();
 
+	//gets port and IP from file config.txt
 	GetPortandIP();
 
 	//loop to ensure correct input
@@ -80,10 +84,12 @@ int main()
 			ProgramStart(2);
 			break;
 		case 3:
+			//end program
 			systemOn = false;
 		}
 	}
 
+	//waits till message queue is empty befor ending program
 	while (!textQueue.empty())
 	{
 		printf("Please Wait While Information Is written to the log\n");
@@ -92,6 +98,8 @@ int main()
 
 	printf("Task Finished\n");
 	printf("Exiting\n");
+
+	//closes open thread WriteToLog
 	WriteToLog.~thread();
 
 	return 0;
@@ -160,7 +168,7 @@ void CreateSocket(bool serverSide)
 			cout << "Bind Failed";
 			ReportError(__LINE__, "Bind Failed ", WSAGetLastError());
 		}
-		//ConnectToServer(2);
+		//ConnectToServer(true);
 
 		cout << "\nCONNECTED\n";
 		connected = true;
@@ -168,7 +176,7 @@ void CreateSocket(bool serverSide)
 	}
 	else
 	{
-		//ConnectToServer(1);
+		//ConnectToServer(false);
 		connected = true;
 		SendAndRecieve();
 	}
@@ -357,6 +365,7 @@ void SendAndRecieve(bool serverSide)
 			{
 				//passes out error code t screen
 				cout << "Receve Error " << WSAGetLastError();
+				ReportError(__LINE__, "Receve Error ", WSAGetLastError());
 			}
 			if (recvResult > 0)
 			{
@@ -481,28 +490,33 @@ void GetPortandIP()
 	string ip;
 
 	string port;
-	//int offset = 0;
 
-
+	//opens the file config.txt is avaible
 	configFile.open("config.txt", ios::in);
+
+	//checks values after element 4 in file
 	configFile.seekg(4, ios::beg);
 	configFile >> ip;
 
-	//
-
+	//length of ip and padding
 	int offset = ip.length()+12;
 
+	//checks the value after element offset
 	configFile.seekg(offset, ios::beg);
 	configFile >> port;
 
+	//makes newip length the size of IP
 	newIP = (char*)malloc(sizeof(ip));
+	//copies value of ip into char* casted ip to assign it to newIP
 	char* castedIP = strcpy(new char[ip.length() + 1], ip.c_str());
 
+	//iterates to assign all value of ip to newIP
 	for (size_t i = 0; i < sizeof(ip); i++)
 	{
 		newIP[i] = castedIP[i];
 	}
 
+	//sets portNum to port value taken from file
 	portNum = stoi(port);
 }
 
