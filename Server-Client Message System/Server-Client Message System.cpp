@@ -28,7 +28,6 @@ struct sockaddr_in newSock, otherSock;
 int portNum, sockLen = sizeof(otherSock), iResult;
 
 char* newIP = (char*)malloc(sizeof(char) * 15);
-const char* response = "R";
 char recvBuffer[200]; //= (char*)malloc(200);
 
 int currentTime = 0, previousTime = 0, delayTime = 0;
@@ -175,10 +174,11 @@ void CreateSocket(bool serverSide)
 	}
 }
 
-
 char* MakeMessage(int seq, int count, bool specialVal)
 {
 	SYSTEMTIME lt;
+	char* sequenceNum = (char*)malloc(10);
+
 
 	GetLocalTime(&lt);
 
@@ -186,7 +186,8 @@ char* MakeMessage(int seq, int count, bool specialVal)
 	string R = "R";
 	string E = "E";
 	string recieved = "Recieved at:";
-	string seqNum = "00" + to_string(seq);
+	snprintf(sequenceNum, 6, "%05d", seq);
+	string seqNum = sequenceNum; 
 	string milSeconds = to_string(lt.wMilliseconds);
 	string seconds = to_string(lt.wSecond);
 	string mins = to_string(lt.wMinute);
@@ -473,21 +474,25 @@ void CloseConnection()
 	WSACleanup(); //standard winsock function to cleanup after and close all existing socket resources	
 }
 
-
 void GetPortandIP()
 {
 	ifstream configFile;
 
 	string ip;
 
-	int port;
+	string port;
+	//int offset = 0;
+
 
 	configFile.open("config.txt", ios::in);
 	configFile.seekg(4, ios::beg);
 	configFile >> ip;
 
+	//
 
-	configFile.seekg(ip.length()+12);
+	int offset = ip.length()+12;
+
+	configFile.seekg(offset, ios::beg);
 	configFile >> port;
 
 	newIP = (char*)malloc(sizeof(ip));
@@ -498,9 +503,8 @@ void GetPortandIP()
 		newIP[i] = castedIP[i];
 	}
 
-	portNum = port;
+	portNum = stoi(port);
 }
-
 
 void WriteMessagesToFile()
 {
@@ -517,7 +521,6 @@ void WriteMessagesToFile()
 		this_thread::sleep_for(10ms);
 	}
 }
-
 
 //error file function that outputs a list of errors whilst runnin the porgram
 void ReportError(int lineNum, string text, int errorCode)
