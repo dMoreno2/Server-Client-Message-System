@@ -12,7 +12,7 @@ void ProgramStart(int switchValue);
 
 void CreateSocket(bool serverSide = false);
 //void ConnectToServer(int programType = 1);
-char* MakeMessage(int seq, int count);
+char* MakeMessage(int seq, int count, bool specialVal = false);
 void SendAndRecieve(bool serverSide = false);
 void CloseConnection();
 void GetPortandIP();
@@ -30,6 +30,8 @@ int portNum, sockLen = sizeof(otherSock), iResult;
 char* newIP = (char*)malloc(sizeof(char) * 15);
 const char* response = "R";
 char recvBuffer[200]; //= (char*)malloc(200);
+
+double currentTime, previousTime;
 
 string user;
 
@@ -173,44 +175,8 @@ void CreateSocket(bool serverSide)
 	}
 }
 
-//void ConnectToServer(int programType)
-//{
-//	switch (programType)
-//	{
-//	case 1:	//FOR CLIENT
-//		//searches for connection to server
-//		if (connect(listenSocket, (struct sockaddr*)&newSock, sizeof(newSock)) < 0)
-//		{
-//			cout << "Could not connect ";
-//			ReportError(__LINE__, "Connection Failed ", WSAGetLastError());
-//		}
-//		connected = true;
-//
-//		SendAndRecieve();
-//
-//		break;
-//
-//	case 2: //FOR SERVER
-//		//creates a connection between server and client 
-//		int addrLen = sizeof(newSock);
-//		newSocket = accept(listenSocket, (SOCKADDR *)&newSock, &addrLen);
-//		if (newSocket == INVALID_SOCKET)
-//		{
-//			cout << "No Accept";
-//			ReportError(__LINE__, "Accept connection failed. ", WSAGetLastError());
-//		}
-//		else
-//		{
-//			cout << "\nCONNECTED\n";
-//			connected = true;
-//			closesocket(listenSocket);
-//			SendAndRecieve(true);
-//		}
-//		break;
-//	}
-//}
 
-char* MakeMessage(int seq, int count)
+char* MakeMessage(int seq, int count, bool specialVal)
 {
 	SYSTEMTIME lt;
 
@@ -227,34 +193,92 @@ char* MakeMessage(int seq, int count)
 	string hours = to_string(lt.wHour);
 	string text;
 
+	if (specialVal)
+	{
+		if (count % 3 == 0)
+		{
+			text = E + " " + seqNum + " " + hours + ":" + mins + ":" + seconds + ":" + milSeconds;
+			// R E 002 12:12:122
+			
+			//create char pointer at the size of text to hold text passed out of function
+			char* temp = (char*)malloc(sizeof(text));
+
+			//copies text onto the char pointer temp
+			temp = strcpy(new char[text.length() + 1], text.c_str());
+
+			//passes temp back out to send
+			return temp;
+		}
+		if (count % 3 == 1)
+		{
+			text = ack + " " + E + " " + seqNum + " " + hours + ":" + mins + ":" + seconds + ":" + milSeconds;
+			// ACK E 002 12:12:122
+			
+			//create char pointer at the size of text to hold text passed out of function
+			char* temp = (char*)malloc(sizeof(text));
+
+			//copies text onto the char pointer temp
+			temp = strcpy(new char[text.length() + 1], text.c_str());
+
+			//passes temp back out to send
+			return temp;
+		}
+		if (count % 3 == 3)
+		{
+			text = ack + " " + seqNum + " " + hours + ":" + mins + ":" + seconds + ":" + milSeconds;
+			// E 002 12:12:122
+			
+			//create char pointer at the size of text to hold text passed out of function
+			char* temp = (char*)malloc(sizeof(text));
+
+			//copies text onto the char pointer temp
+			temp = strcpy(new char[text.length() + 1], text.c_str());
+
+			//passes temp back out to send
+			return temp;
+		}
+	}
+
 	if (count % 4 == 0)
 	{
-		text = R + " " + seqNum + " " + hours + ":" + mins + ":" + seconds + ":" + milSeconds;
+		//request text
+		text = R + " - " + seqNum + " - " + hours + ":" + mins + ":" + seconds + ":" + milSeconds;
+		previousTime = stoi(seconds);
+		previousTime += stoi(milSeconds);
+		// R - 001 - 12:12:122
 	}
 	if (count % 4 == 1)
 	{
-		text = ack + " " + R + " " + seqNum + " " + hours + ":" + mins + ":" + seconds + ":" + milSeconds;
+		//accepted request text
+		text = ack + " - " + R + " - " + seqNum + " - " + hours + ":" + mins + ":" + seconds + ":" + milSeconds;
+		// ACK - R - 001 - 12:12:122
 	}
 	if (count % 4 == 2)
 	{
-		text = ack + " " + R + " " + seqNum + " " + recieved + " " + hours + ":" + mins + ":" + seconds + ":" + milSeconds;
+		// Acknowleged request accepted text
+		text = ack + " - " + R + " - " + seqNum + " - " + recieved + " " + hours + ":" + mins + ":" + seconds + ":" + milSeconds;
+		// ACK - R - 001 - recived at: 12:12:122
 	}
 	if (count % 4 == 3)
 	{
-		text = ack + " " + seqNum + " " + hours + ":" + mins + ":" + seconds + ":" + milSeconds;
-		//to do: roudtrip value calc
-	}
-	if (count == 10)
-	{
-		text = E + " " + seqNum + " " + hours + ":" + mins + ":" + seconds + ":" + milSeconds;
-		//to do: roudtrip value calc
-	}
+		currentTime = stoi(seconds);
+		currentTime += stoi(milSeconds);
+		double delayTime = currentTime - previousTime;
 
+		text = ack + " - " + seqNum + " - " + hours + ":" + mins + ":" + seconds + ":" + milSeconds + " - " + "Round Trip Delay: " + to_string(delayTime) + " Seconds";
+		// ACK - 001 - 12:12:122 - Round Trip Delay: 1 seond 
+		//to do: roudtrip value calc
+		
+	}
+	
 
+	//create char pointer at the size of text to hold text passed out of function
 	char* temp = (char*)malloc(sizeof(text));
 
+	//copies text onto the char pointer temp
 	temp = strcpy(new char[text.length() + 1], text.c_str());
 
+	//passes temp back out to send
 	return temp;
 }
 
@@ -267,17 +291,22 @@ void SendAndRecieve(bool serverSide)
 
 	while (connected)
 	{
+		//checks if running program as sever or client
 		switch (serverSide)
 		{
 		case true:
+			//checks that bytes are recieved from recvfrom, returns size in bytes or -1 if error
 			recvResult = recvfrom(listenSocket, recvBuffer, 100, 0, (struct sockaddr*)&otherSock, &sockLen);
 			if (recvResult < 0)
 			{
+				//passes out error code t screen
 				cout << "Receve Error " << WSAGetLastError();
 			}
 			if (recvResult > 0)
 			{
+				//printes recieved message
 				cout << "MESSAGE: " << recvBuffer << endl;
+				//adds text recived to a queue for writing later
 				textQueue.push(recvBuffer);
 				//Sleep(3000);
 				serverSide = !serverSide;
@@ -285,38 +314,103 @@ void SendAndRecieve(bool serverSide)
 			break;
 
 		case false:
+			//creates message to be sent to the partner
 			tempBuffer = MakeMessage(seqNum, count);
+			//gets the value of sendto, returns value in bytes or -1 if error occures
+			//sends message defined in tempbuffer to partner
 			iResult = sendto(listenSocket, tempBuffer, 100, 0, (struct sockaddr*)&otherSock, sockLen);
 			if (iResult == SOCKET_ERROR)
 			{
+				//output error
 				cout << "Send Failed ";
 				ReportError(__LINE__, "Send Failed ", WSAGetLastError());
 			}
 			if (iResult > 0)
 			{
-				Sleep(3000);
+				//makes thread wait for 3 seconds 
+				//switches sending and recieveing function
 				serverSide = !serverSide;
+				//increments count by 1 
 				count++;
+				//checks if count is equvilant to 0 
 				if (count % 4 == 0)
 				{
+					Sleep(1000);
 					seqNum++;
+				}
+				//checks if count is equvilant to 4
+				if (count % 4 == 1)
+				{
+					Sleep(1000);
+					//calc roundtrip
+				}
+				//checks if count is equvilant to 4
+				if (count % 4 == 2)
+				{
+				
+				}
+				//checks if count is equvilant to 4
+				if (count % 4 == 3)
+				{
+					Sleep(1000);
+					//calc roundtrip
 				}
 			}
 			break;
 		}
 
+		//checks if E check is pressed
 		if (GetKeyState('E') & 0x8000/*Check if high-order bit is set (1 << 15)*/)
 		{
 			string userResponse;
 			cout << "E Detected, Wanna Exit? - Y/N \n";
+			//gets user input
 			cin >> userResponse;
 			if (userResponse == "Y" || userResponse == "y")
 			{
-				tempBuffer = MakeMessage(seqNum, 10);
+				count == 0;
+				//generates End message, sends to partner, prints message to screen, adds message to queue, waits 3 seconds 
+				tempBuffer = MakeMessage(seqNum, count, true);
 				sendto(listenSocket, tempBuffer, 100, 0, (struct sockaddr*)&otherSock, sockLen);
+				cout << "MESSAGE: " << recvBuffer << endl;
+				textQueue.push(recvBuffer);
+				Sleep(1000);
+				count++;
+
+				//recives message, prints message to screen, adds message to queue, waits 3 seconds
 				recvfrom(listenSocket, recvBuffer, 100, 0, (struct sockaddr*)&otherSock, &sockLen);
+				cout << "MESSAGE: " << recvBuffer << endl;
+				textQueue.push(recvBuffer);
+				Sleep(1000);
+
+				//generates End message, sends to partner, prints message to screen, adds message to queue, waits 3 seconds 
+				tempBuffer = MakeMessage(seqNum, count, true);
 				sendto(listenSocket, tempBuffer, 100, 0, (struct sockaddr*)&otherSock, sockLen);
+				cout << "MESSAGE: " << recvBuffer << endl;
+				textQueue.push(recvBuffer);
+				Sleep(1000);
+				count++;
+
+				//recives message, prints message to screen, adds message to queue, waits 3 seconds
+				recvfrom(listenSocket, recvBuffer, 100, 0, (struct sockaddr*)&otherSock, &sockLen);
+				cout << "MESSAGE: " << recvBuffer << endl;
+				textQueue.push(recvBuffer);
+				Sleep(1000);
+
+				//tempBuffer = MakeMessage(seqNum, count, true);
+				//sendto(listenSocket, tempBuffer, 100, 0, (struct sockaddr*)&otherSock, sockLen);
+				//cout << "MESSAGE: " << recvBuffer << endl;
+				//textQueue.push(recvBuffer);
+				//Sleep(10);
+
+				////recives message, prints message to screen, adds message to queue, waits 3 seconds
+				//recvfrom(listenSocket, recvBuffer, 100, 0, (struct sockaddr*)&otherSock, &sockLen);
+				//cout << "MESSAGE: " << recvBuffer << endl;
+				//textQueue.push(recvBuffer);
+				//Sleep(1000);
+
 				connected == false;
+
 				break;
 			}
 		}
@@ -376,7 +470,7 @@ void WriteMessagesToFile()
 	{
 		if (!textQueue.empty())
 		{
-			messageLog << textQueue.front() << endl;
+			messageLog << user << "-" << textQueue.front() << endl;
 			textQueue.pop();
 		}
 		this_thread::sleep_for(10ms);
